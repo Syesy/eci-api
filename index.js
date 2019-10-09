@@ -1,18 +1,23 @@
+require("dotenv").config();
 const express = require("express");
-const Sequelize = require("sequelize");
+const bcrypt = require("bcrypt");
 const bodyParser = require("body-parser");
 const validator = require("email-validator");
-const sequelize = new Sequelize("ecipar", "patrick", "1", {
-  host: "localhost",
-  dialect: "mysql" /* one of 'mysql' | 'mariadb' | 'postgres' | 'mssql' */
-});
+const jwt = require("jsonwebtoken");
+const authMiddleware = require("./authMiddleware");
+const User = require("./models/User");
+const City = require("./models/City");
+const Person = require("./models/Person");
+const HMAC_JWT_SECRET = process.env.HMAC_JWT_SECRET;
 const port = 3000;
 
 const app = express();
+app.use(authMiddleware);
 //Prende i body codificati con
 //x-www-form-urlencoded e li trasforma in oggetti
 //javascript
 app.use(bodyParser.urlencoded());
+
 //Prende i body codificati con
 //application/json e li trasforma in oggetti
 //javascript
@@ -25,71 +30,6 @@ app.use((req, res, next) => {
   console.log("Middleware 2");
   next();
 });
-const City = sequelize.define(
-  "city",
-  {
-    // attributes
-    id: {
-      primaryKey: true,
-      type: Sequelize.UUIDV4,
-      allowNull: false,
-      defaultValue: Sequelize.UUIDV4
-    },
-    name: {
-      type: Sequelize.STRING
-    }
-  },
-  {
-    tableName: "cities"
-  }
-);
-
-const User = sequelize.define(
-  "user",
-  {
-    // attributes
-    id: {
-      primaryKey: true,
-      type: Sequelize.UUIDV4,
-      allowNull: false,
-      defaultValue: Sequelize.UUIDV4
-    },
-    name: {
-      type: Sequelize.STRING
-    },
-    email: {
-      type: Sequelize.STRING
-    },
-    password: {
-      type: Sequelize.STRING
-    }
-  },
-  {
-    tableName: "users"
-  }
-);
-
-const Person = sequelize.define(
-  "person",
-  {
-    // attributes
-    id: {
-      primaryKey: true,
-      type: Sequelize.UUIDV4,
-      allowNull: false,
-      defaultValue: Sequelize.UUIDV4
-    },
-    name: {
-      type: Sequelize.STRING
-    },
-    cityId: {
-      type: Sequelize.UUIDV4
-    }
-  },
-  {
-    tableName: "people"
-  }
-);
 
 app.get("/cities", async (req, res) => {
   if (req.query.name) {
@@ -140,36 +80,87 @@ app.post("/cities/:cityId/people", async (req, res) => {
   //   return res.json(person)
 });
 
+
+app.post("/auth/login", (req, res) => {
+  const user = await User.findOne({
+    where: {
+      email: req.body.email
+    }
+  })
+  if (!user) return res.sendStatus(404)
+  const authenticated = await bcrypt.compare(
+    req.body.password, user.password)
+
+  if (authenticated) {
+
+//Dobbiamo generare il token
+    const token = jwt.sign(
+      {
+        userId: user.id
+      },
+      HMAC_JWT_SECRET,
+      {
+        expiresIn: "10d"
+      }
+    );
+
+    return res.json({
+      user: user,
+      token: token
+    });
+    
+  } else {
+    return res.sendStatus(404)
+  }
+})
+
 app.post("/users", async (req, res) => {
   if (!validator.validate(req.body.email)) {
     return res.status(400).json({
       error: "invalid_email"
     });
   }
+
   let hashPw;
   try {
     hashPw = await bcrypt.hash(req.body.password, 10);
   } catch (e) {
-    return res.status(400);
+    console.log(e);
+    return res.sendStatus(400);
   }
-  if (
-    await User.findOne({
-      where: {
-        email: req.body.email
-      }
-    })
-  ) {
-    return res.status(400).json({
-      error: "email_already_exists"
-    });
-  }
+
+  // if (
+  //   await User.findOne({
+  //     where: {
+  //       email: req.body.email
+  //     }
+  //   })
+  // ) {
+  //   return res.status(400).json({
+  //     error: "email_already_exists"
+  //   });
+  // }
 
   const user = await User.create({
     name: req.body.name,
     email: req.body.email,
     password: hashPw
   });
-  return res.json(user);
+
+  const token = jwt.sign(
+    {
+      userId: user.id
+    },
+    HMAC_JWT_SECRET,
+    {
+      expiresIn: "10d"
+    }
+  );
+
+  return res.json({
+    user: user,
+    token: token
+  });
 });
 
 app.listen(port, () => {

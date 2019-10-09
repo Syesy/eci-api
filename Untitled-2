@@ -1,0 +1,40 @@
+REALIZZARE  API CHE PERMETTA 
+LA VISIONE DI UNA LISTA DI PIATTI
+{
+    name: String
+    allergens: [Allergen]
+    description: String
+    price: Float (Double)
+}
+E IL LORO INSERIMENTO
+
+
+{
+
+    name: ""
+    allergens: ["hhefhaef-fhqhweghqweg-gjqwjegjqwg"]
+}
+
+{
+    name: "",
+    allergens: [{
+        id: "hjhdhqhwf-fqhwfhqhwf-"
+
+    }, {
+        name: "Uova"
+    }]
+}
+
+
+{
+    name: "Piatto",
+    allergens: [{
+        op: "create",
+        data: {
+            name: "Uova"
+        }
+    }, {
+        op: "link",
+        data: ["idhhfqwefj-fjajwef-AJFJwf-"]
+    }]
+}
